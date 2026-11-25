@@ -85,12 +85,12 @@ def create_ui():
                             ui.output_table("tabela_sem_repeticao"),
                         ),
                         ui.nav_panel(
-                            "Lematiza, remove acentuação e dois caracteres",
-                            ui.output_table("tabela_acentuacao_2caracteres"),
+                            "Remove stopwords e converte para minúsculo",
+                            ui.output_table("tabela_sem_stopwords_antes"),
                         ),
                         ui.nav_panel(
-                            "Remove stopwords e converte para minúsculo",
-                            ui.output_table("tabela_sem_stopwords_minuscula"),
+                            "Lematiza, remove acentuação e dois caracteres",
+                            ui.output_table("tabela_acentuacao_2caracteres"),
                         ),
                     ),
 

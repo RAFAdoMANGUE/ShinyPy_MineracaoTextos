@@ -312,6 +312,46 @@ def setup_server(input, output, session):
         else:
             return None
         
+    def normalizar_texto(s):
+        """Minúsculo e sem acento (usado para comparar com a lista de stopwords)."""
+        return ''.join(
+            c for c in unicodedata.normalize('NFKD', str(s))
+            if not unicodedata.combining(c)
+        ).lower().strip()
+
+    @reactive.Calc
+    def remove_stopw_antes_lematizacao():
+        """Remove stopwords ANTES da lematização/agrupamento por radical.
+
+        Evita que uma stopword (ex.: "pra") seja agrupada com outra palavra de mesmo
+        radical (ex.: "praia") e contada junto com ela. O token mantém acento e forma
+        original, porque o spaCy precisa disso na etapa seguinte.
+        """
+        dados = remove_repeticao()
+        if dados is None or not isinstance(dados, pd.DataFrame) or dados.empty:
+            return dados
+
+        col = input.coluna_texto()
+        if not col or col not in dados.columns:
+            return dados
+
+        stopwords = {normalizar_texto(s) for s in (conjunto_editavel().get() or [])}
+
+        def filtrar(texto):
+            if pd.isna(texto):
+                return ""
+            tokens = str(texto).lower().split()
+            return " ".join(t for t in tokens if normalizar_texto(t) not in stopwords)
+
+        dados = dados.copy()
+        dados[col] = dados[col].apply(filtrar)
+        return dados
+
+    @output
+    @render.table
+    def tabela_sem_stopwords_antes():
+        return remove_stopw_antes_lematizacao()
+
     def lemmatizar_lista(textos):
         docs = list(nlp.pipe(textos.astype(str)))
         lemas_processados = []
@@ -324,7 +364,7 @@ def setup_server(input, output, session):
 
     @reactive.Calc
     def texto_lemmatizado():
-        dados = remove_repeticao()
+        dados = remove_stopw_antes_lematizacao()
         if dados is None or dados.empty:
             return None
 
@@ -488,38 +528,10 @@ def setup_server(input, output, session):
 
     @reactive.Calc
     def remove_stopw_minuscula():
-        tabela_editada = conjunto_editavel().get() or []
-
-        # Normaliza stopwords: remove acento + lemmatiza
-        def normalizar_stopword(s):
-            return ''.join(
-                c for c in unicodedata.normalize('NFKD', s)
-                if not unicodedata.combining(c)
-            ).lower().strip()
-
-        tabela_editada = [normalizar_stopword(s) for s in tabela_editada]
-
-        # ✅ Use remove_acentuacao_2caracteres() — já normalizado
-        dados = remove_acentuacao_2caracteres()
-
-        if dados is None or not isinstance(dados, pd.DataFrame):
-            return None
-
-        dados_stopw = dados.copy()
-        coluna = "Sem acento e sem palavras curtas"  # nome da coluna gerada por remove_acentuacao_2caracteres
-
-        if coluna not in dados_stopw.columns:
-            return dados_stopw
-
-        def remover_stopwords_tokens(texto):
-            if pd.isna(texto):
-                return texto
-            palavras = str(texto).lower().split()
-            return " ".join(p for p in palavras if p not in tabela_editada)
-
-        dados_stopw[coluna] = dados_stopw[coluna].apply(remover_stopwords_tokens)
-
-        return dados_stopw
+        # As stopwords já foram removidas ANTES da lematização
+        # (remove_stopw_antes_lematizacao). Aqui só se repassa o resultado final do
+        # pré-processamento, que é o que tabelas, gráficos, nuvem e tópicos consomem.
+        return remove_acentuacao_2caracteres()
 
     @output
     @render.table
